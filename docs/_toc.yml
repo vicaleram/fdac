@@ -3,12 +3,14 @@
 
 format: jb-book
 root: intro
+
 chapters:
-- file: Tutorial_fdac
-- part: Examples
-  chapters:
-    - file: examples/HD26965_PCA_fd.ipynb
-    - file: examples/HD3651_fdac.ipynb
-    - file: examples/HD34411_fdac.ipynb
-- file: notebooks
-- file: markdown-notebooks
+  - file: Tutorial_fdac
+  - part: Examples
+    chapters:
+      - file: examples/HD26965_PCA_fd.ipynb
+      - file: examples/HD3651_fdac.ipynb
+      - file: examples/HD34411_fdac.ipynb
+  - file: notebooks
+  - file: markdown-notebooks
+
