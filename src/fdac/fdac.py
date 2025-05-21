@@ -223,9 +223,8 @@ class fdac:
             self.FFTframe[cname+" re"] = self.fft_list[i].real 
             self.FFTframe[cname+" im"] = self.fft_list[i].imag #add abs value to this part and the computer will just interpret it at
 
-        self.FFTframe.head()
         self.scaledFFT = StandardScaler().fit_transform(self.FFTframe.iloc[:,1:])
-
+        ## Comment: I am not sure if this needs to be updated to also scale the ffts of the RVs to unit variance and no mean.
     
     def plotNFFT(self):
         
@@ -252,7 +251,7 @@ class fdac:
                     ax.set_ylabel(r"$\mathcal{F}\{x_t\}$")
                 if (i == 0):
                     ax.legend(loc="best", fontsize="small")
-                if (i >= 2):
+                if (i >= (len(self.obs)-2)):
                     ax.set_xlabel("Frequency (cycles / day)")
         else:
             rows= ceil(np.sqrt(len(self.obs)))
