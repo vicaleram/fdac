@@ -338,18 +338,18 @@ class fdac:
         self.FFT_ac.imag = self.FFT_imag_ac
 
         # FINUFFT amplitude scaling is a bit ratty, hence "raw"
-        self.activity = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.N
-        #print(np.max(self.activity_raw.real), np.max(self.activity_raw.imag)) # check that the imaginary parts are negligible
+        self.activity_raw = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.N
+        print(np.max(self.activity_raw.real), np.max(self.activity_raw.imag)) # check that the imaginary parts are negligible
         
         # Rescale variance using Parseval's theorem
-        #variance_ratio = np.sum(np.abs(self.FFT_ac)**2) / np.sum(np.abs(self.fft_list[0])**2)
+        variance_ratio = np.sum(np.abs(self.FFT_ac)**2) / np.sum(np.abs(self.fft_list[0])**2)
 
         print("Raw standard deviation", f"{self.obs[0].std():.4f}")
-        #print("Variance ratio:", f"{variance_ratio:.4f}")
+        print("Variance ratio:", f"{variance_ratio:.4f}")
 
         # Make activity RVs now have unit variance
-        #self.activity_scaled = (self.activity_raw.real - np.mean(self.activity_raw.real)) / np.std(self.activity_raw.real)
-        #print("Should be 1:", np.var(self.activity_scaled))
+        self.activity_scaled = (self.activity_raw.real - np.mean(self.activity_raw.real)) / np.std(self.activity_raw.real)
+        print("Should be 1:", np.var(self.activity_scaled))
 
         # Calculate the standard deviation of the activity signal
         #new_stdev = np.sqrt(variance_ratio * self.obs[0].var())
