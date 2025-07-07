@@ -7,7 +7,7 @@ root: intro.md
 parts:
   - caption: Get Started
     chapters:
-    - file: Tutorial_fdac.ipynb
+    - file: FDACTutorial.ipynb
   - caption: Examples
     chapters:
       - file: examples/HD26965_PCA_fd.ipynb

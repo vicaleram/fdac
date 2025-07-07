@@ -148,32 +148,6 @@ class fdac:
         self.fgrid = np.linspace(-Nyquist, Nyquist, num=2*self.nf+1, endpoint=True)
         # print(self.fgrid)
         #self.powfgrid = self.fgrid[self.nf:]
-    '''
-    def frequency_grid(self, Nyquistf):
-        
-
-        Computes the frequency grid given a specific type of Nyquist frequency calculated for the time series
-        
-        :param Nyquistf: Nyquist frequency used to compute the frequency domain. Usually uses one of the frequencies calculated when initializing :class:`fdac`
-        :type Nyquistf: float
-
-        try:
-            if Nyquistf < 0:
-                raise ValueError
-        except ValueError:
-            print("Nyquist frequency must be float > 0 - no frequency grid calculated")
-            return
-        
-        self.maxf = 2* Nyquistf      # Maximum frequency is 2x the Nyquist frequency
-        self.Ray = 1/ np.max(self.t)
-        self.nR_pos = ceil(self.maxf / self.Ray) #Number of Rayleigh resolutions
-        #self.nR_pos = int(self.maxf / self.Ray) + 1 #Number of Rayleigh resolutions
-        print("Number of Rayleigh resolution units:", self.nR_pos)
-        self.nf = 2*self.nR_pos + 1     
-        self.fgrid = np.linspace(-self.maxf, self.maxf, num= self.nf, endpoint=True)
-        print("Maximum frequency (cycles/day):", f"{self.maxf:.4f}")
-        print("Rayleigh resolution:", f"{self.Ray:.4f}")
-    '''
         
     #Computes the NFFT of the activity indicators   
     def computeNFFT(self):
@@ -216,15 +190,25 @@ class fdac:
         # data frame with columns = real + imaginary parts of FFTs
         self.FFTframe = pd.DataFrame()
         self.FFTframe['frequency'] = self.fgrid
-        
+        #'''
         #pack the FFT of the all the components
         for i in range(1,len(self.fft_list)):
             cname = self.names[i]
             self.FFTframe[cname+" re"] = self.fft_list[i].real 
             self.FFTframe[cname+" im"] = self.fft_list[i].imag #add abs value to this part and the computer will just interpret it at
 
-        self.scaledFFT = StandardScaler().fit_transform(self.FFTframe.iloc[:,1:])
+        #'''
         ## Comment: I am not sure if this needs to be updated to also scale the ffts of the RVs to unit variance and no mean.
+
+        ### Below is an attempt to do exactly what the comment above asks, the code between the ''' used to be the old code.
+        ### What changed was to let the loop to go over all of the fft_list
+        # data frame with columns = real + imaginary parts of FFTs
+        #pack the FFT of the all the components
+        #for i in range(len(self.fft_list)):
+        #    cname = self.names[i]
+        #    self.FFTframe[cname+" re"] = self.fft_list[i].real 
+        #    self.FFTframe[cname+" im"] = self.fft_list[i].imag #add abs value to this part and the computer will just interpret it at
+        #self.scaledFFT = StandardScaler().fit_transform(self.FFTframe.iloc[:,1:])
     
     def plotNFFT(self):
         
@@ -274,48 +258,6 @@ class fdac:
             for i in range(len(self.obs), len(axarr)):
                 axarr[i].axis('off')  # Turn off the axis for extra subplots
     
-    def pc_analysis(self, disp_variance = True):
-        
-        '''
-        Performs the principal component analysis (PCA) of the observations excluding the main observatory variable
-        :param disp_variance: plots the tota varaince as a function of components
-        :type disp_variance: bool, optional
-        '''
-        
-        ### This is not used for now so I will leave to improve for later###
-        pc_an = PCA()
-        self.pc = pc_an.fit_transform(self.scaledFFT)
-        self.FFT_pc = pd.DataFrame(data=self.pc)
-        self.FFT_pc.head()
-        self.pc_loadings = pc_an.components_.T * \
-               np.sqrt(pc_an.explained_variance_)
-        explanatory = self.FFTframe.columns.tolist()[1:]
-        self.loading_pc = pd.DataFrame(pc_loadings)
-        self.loading_pc["variable"] = explanatory
-        
-        if disp_variacen ==  True:
-            plt.figure(figsize=(9,5))
-            plt.plot(np.cumsum(pc_analysis.explained_variance_ratio_), color = 'RoyalBlue')
-            plt.xlabel('Number of components')
-            plt.ylabel('Cumulative explained variance')
-        
-    def displayloadings(self):
-        
-        '''
-        Display the loadings from the PCA analysis
-        '''
-        
-        fig = ex.scatter(x=self.loading_pc.iloc[:,0], y=self.loading_pc.iloc[:,1], \
-                 text=self.loading_pc['variable'],)
-        fig.update_layout(height=500, width=500, title_text='Loadings', \
-                         xaxis_title="Component 1", yaxis_title="Component 2",)
-        fig.update_xaxes(range=[-1.1, 1.1])
-        fig.update_yaxes(range=[-1.1, 1.1])
-        fig.update_traces(textposition='bottom center')
-        fig.add_shape(type="line", x0=-0, y0=-1.1, x1=-0, y1=1.1, line=dict(color="RoyalBlue",width=3))
-        fig.add_shape(type="line", x0=-1.1, y0=0, x1=1.1, y1=0, line=dict(color="RoyalBlue",width=3))
-        fig.show()
-    
     def linear_reg(self, pca = False):
         
         '''
@@ -330,55 +272,24 @@ class fdac:
         except ValueError:
             print("NFFT hasn't been computed yet, compute NFFT before proceeding")
             return
-            
-        if pca == True:
-            try:
-                no_pca = (self.pc is None)
-                if no_pca:
-                    raise ValueError
-            except ValueError:
-                print("PCA hasn't been computed yet, perfom PCA analysis before doing linear regression or set pca = True")
-                print("No linear regression computed")
-                return
-            
-            self.regr_real = linear_model.LinearRegression()
-            self.regr_real.fit(self.FFT_pc, self.fft_list[0].real)
+        #define the positive frequency grid and NFFT 
+        self.explanatory = self.FFTframe.loc[self.FFTframe.frequency>=0.0, self.FFTframe.columns[1:]]
+        self.targets = np.column_stack((self.first_FFT[self.fgrid>=0.0].real,self.first_FFT[self.fgrid>=0.0].imag))
+        self.fd_model = linear_model.LinearRegression(fit_intercept=False).fit(self.explanatory, self.targets)
 
-            print('Real')
-            print('----')
-            print('Intercept: \n', self.regr_real.intercept_)
-            print('Coefficients: \n', self.regr_real.coef_)
+        print('Coefficients')
+        print('----')
+        print('Coefficients: \n', self.fd_model.coef_)
 
-            self.regr_imag = linear_model.LinearRegression()
-            self.regr_imag.fit(self.FFT_pc, self.fft_lis[0].imag)
-
-            print('\nImaginary')
-            print('---------')
-            print('Intercept: \n', self.regr_imag.intercept_)
-            print('Coefficients: \n', self.regr_imag.coef_)
-            
-            self.FFT_real_ac = self.regr_real.predict(self.FFT_pc)  #Why to the whole fft and not to each real and imaginary
-            self.FFT_imag_ac = self.regr_imag.predict(self.FFT_pc)
+        print('\nIntercept')
+        print('---------')
+        print('Intercept: \n', self.fd_model.intercept_)
         
-        else:
-            self.regr_real = linear_model.LinearRegression()
-            self.regr_real.fit(self.scaledFFT, self.fft_list[0].real)
-
-            print('Real')
-            print('----')
-            print('Intercept: \n', self.regr_real.intercept_)
-            print('Coefficients: \n', self.regr_real.coef_)
-
-            self.regr_imag = linear_model.LinearRegression()
-            self.regr_imag.fit(self.scaledFFT, self.fft_list[0].imag)
-
-            print('\nImaginary')
-            print('---------')
-            print('Intercept: \n', self.regr_imag.intercept_)
-            print('Coefficients: \n', self.regr_imag.coef_)
-            
-            self.FFT_real_ac = self.regr_real.predict(self.scaledFFT)  #Why to the whole fft and not to each real and imaginary
-            self.FFT_imag_ac = self.regr_imag.predict(self.scaledFFT)
+        #predict the NFFT
+        self.y_pred = self.fd_model.predict(self.explanatory)
+        #Make the arrays for the imaginary and real part
+        self.FFT_real_ac = np.append(np.flip(self.y_pred[1:,0]),self.y_pred[:,0])      # Only get the values after 0 because the 0 values is the 0 frequency
+        self.FFT_imag_ac = np.append(-np.flip(self.y_pred[1:,1]),self.y_pred[:,1])
             
         
     def fftac_plot(self):
@@ -421,28 +332,28 @@ class fdac:
             print("Linear regression hasn't been computed, run linear_reg()")
             print("No inversion from frequecy domain calculated")
             return
-            
-        self.FFT_ac = np.zeros_like(self.fft_list[0])
+        #Make the array the holds the NFFT
+        self.FFT_ac = np.zeros_like(self.first_FFT)
         self.FFT_ac.real = self.FFT_real_ac
         self.FFT_ac.imag = self.FFT_imag_ac
 
         # FINUFFT amplitude scaling is a bit ratty, hence "raw"
-        self.activity_raw = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.N
+        self.activity = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.N
         #print(np.max(self.activity_raw.real), np.max(self.activity_raw.imag)) # check that the imaginary parts are negligible
         
         # Rescale variance using Parseval's theorem
-        variance_ratio = np.sum(np.abs(self.FFT_ac)**2) / np.sum(np.abs(self.fft_list[0])**2)
+        #variance_ratio = np.sum(np.abs(self.FFT_ac)**2) / np.sum(np.abs(self.fft_list[0])**2)
 
         print("Raw standard deviation", f"{self.obs[0].std():.4f}")
-        print("Variance ratio:", f"{variance_ratio:.4f}")
+        #print("Variance ratio:", f"{variance_ratio:.4f}")
 
         # Make activity RVs now have unit variance
-        self.activity_scaled = (self.activity_raw.real - np.mean(self.activity_raw.real)) / np.std(self.activity_raw.real)
+        #self.activity_scaled = (self.activity_raw.real - np.mean(self.activity_raw.real)) / np.std(self.activity_raw.real)
         #print("Should be 1:", np.var(self.activity_scaled))
 
         # Calculate the standard deviation of the activity signal
-        new_stdev = np.sqrt(variance_ratio * self.obs[0].var())
-        self.activity = self.activity_scaled * new_stdev + self.obs[0].mean()
+        #new_stdev = np.sqrt(variance_ratio * self.obs[0].var())
+        #self.activity = self.activity_scaled * new_stdev + self.obs[0].mean()
         #print("Should be equal:", f"{np.std(self.activity):.4f}", f"{new_stdev:.4f}")
         print("Inversion fully computed")
         
@@ -464,25 +375,28 @@ class fdac:
             print("No plot displayed")
             return
         plt.figure(figsize=(8,6))
-        plt.errorbar(self.t, self.first_com, yerr= err, marker='s', ls='none', color='mediumblue', label='Total')
-        plt.scatter(self.t, self.activity, color='crimson', marker='o', label='Activity')
+        plt.errorbar(self.t, self.first_com, yerr= err, marker='s', ls='none', color='mediumblue', label='Original', alpha=0.5)
+        #plt.scatter(self.t, self.activity, color='crimson', marker='o', label='Activity')
+        plt.scatter(self.t, self.activity.real, color='skyblue', marker='o', label='Activity')
         plt.xlabel('Time (days)')
         plt.ylabel(self.names[0])
         plt.title('Activity correction')
         plt.legend(loc='lower left')
         
         if clean == True:
-            residuals = self.obs[0] - self.activity
-            print("Std dev of clean RV:", np.std(residuals))
+            #residuals = self.obs[0] - self.activity
+            residuals_raw = self.obs[0] - self.activity.real
+            print("Std dev of clean RV:", np.std(residuals_raw ))
             plt.figure(figsize=(8,6))
             #plt.errorbar(self.t, self.obs[0], yerr= err, marker='s', ls='none', color='mediumblue', label='Total')
-            plt.scatter(self.t, residuals, color='crimson', marker='o', label='Residuals')
+            #plt.scatter(self.t, residuals, color='crimson', marker='o', label='Residuals', alpha=0.5)
+            plt.scatter(self.t, residuals_raw, color='skyblue', marker='o', label='Residuals')
             plt.xlabel('Time (days)')
             plt.ylabel(self.names[0])
             plt.title('Residuals')
             plt.legend(loc='lower left')
         
-    def residual_powplot(self):
+    def residual_powplot(self, log=False):
         
         '''
         Computes the power spectra of the residuals and displays its result
@@ -497,18 +411,23 @@ class fdac:
             print("No plot displayed")
             return
         
-        self.residuals = self.obs[0] - self.activity
-        self.residuals_FFT = nufft1d3(2*np.pi*self.t, self.residuals - np.mean(self.residuals), self.fgrid, \
+        #self.residuals = self.obs[0] - self.activity
+        self.residuals_raw = self.obs[0] - self.activity.real
+        #self.residuals_FFT = nufft1d3(2*np.pi*self.t, self.residuals - np.mean(self.residuals), self.fgrid, \
+        #                              isign=-1, nthreads=1)
+        self.residuals_raw_FFT = nufft1d3(2*np.pi*self.t, self.residuals_raw - np.mean(self.residuals_raw), self.fgrid, \
                                       isign=-1, nthreads=1)
-        
+        indeces = self.fgrid>=0
         plt.figure(figsize=(8,6))
-        plt.plot(self.fgrid, np.abs(self.fft_list[0])**2, label='Total', color='mediumblue', alpha = 0.5)
-        plt.plot(self.fgrid, np.abs(self.residuals_FFT)**2,'--', label='Cleaned', color='r')
+        plt.plot(self.fgrid[indeces], np.abs(self.first_FFT[indeces])**2, label='Original', color='mediumblue', alpha = 0.5)
+        #plt.plot(self.fgrid[indeces], np.abs(self.residuals_FFT[indeces])**2,'--', label='Cleaned', color='r')
+        plt.plot(self.fgrid[indeces], np.abs(self.residuals_raw_FFT[indeces])**2,'-.', label='Cleaned', color='skyblue')
         plt.xlim(0,np.max(self.fgrid))
-        #plt.yscale('log')
+        if log==True:
+            plt.yscale('log')
         # plt.ylim([10,100000])
-        plt.xlabel('Frequency (cycles / day)', fontsize='large')
-        plt.ylabel(self.names[0] + ' power spectrum', fontsize='large')
-        plt.title('Corrected power Spectra', fontsize =16)
+        plt.xlabel('Frequency (cycles / day)')
+        plt.ylabel(self.names[0] + ' power spectrum')
+        plt.title('Corrected power Spectra')
         plt.legend(loc='best')
         plt.tight_layout()
