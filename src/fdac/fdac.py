@@ -12,8 +12,6 @@ from scipy.stats import trim_mean, chi2
 from math import ceil
 import seaborn as sn
 
-plt.rcParams.update({"font.size" : 14})
-plt.rcParams.update({"axes.labelsize" : 14})
 
 #Class definition
 class fdac:
@@ -146,6 +144,8 @@ class fdac:
             print("frequency associated with the median timestep. Make sure that makes")
             print("sense for your dataset.")
         self.fgrid = np.linspace(-Nyquist, Nyquist, num=2*self.nf+1, endpoint=True)
+        #save the lenght of the frequency grid
+        self.len_fgrid = len(self.fgrid)
         # print(self.fgrid)
         #self.powfgrid = self.fgrid[self.nf:]
         
@@ -338,7 +338,7 @@ class fdac:
         self.FFT_ac.imag = self.FFT_imag_ac
 
         # FINUFFT amplitude scaling is a bit ratty, hence "raw"
-        self.activity_raw = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.N
+        self.activity_raw = nufft1d3(2*np.pi*self.fgrid, self.FFT_ac, self.t, isign=1, nthreads=1) / self.len_fgrid
         print(np.max(self.activity_raw.real), np.max(self.activity_raw.imag)) # check that the imaginary parts are negligible
         
         # Rescale variance using Parseval's theorem
@@ -352,9 +352,9 @@ class fdac:
         print("Should be 1:", np.var(self.activity_scaled))
 
         # Calculate the standard deviation of the activity signal
-        #new_stdev = np.sqrt(variance_ratio * self.obs[0].var())
-        #self.activity = self.activity_scaled * new_stdev + self.obs[0].mean()
-        #print("Should be equal:", f"{np.std(self.activity):.4f}", f"{new_stdev:.4f}")
+        new_stdev = np.sqrt(variance_ratio * self.obs[0].var())
+        self.activity = self.activity_scaled * new_stdev + self.obs[0].mean()
+        print("Should be equal:", f"{np.std(self.activity):.4f}", f"{new_stdev:.4f}")
         print("Inversion fully computed")
         
     def activityplot(self, err = None, clean = False):
@@ -376,20 +376,19 @@ class fdac:
             return
         plt.figure(figsize=(8,6))
         plt.errorbar(self.t, self.first_com, yerr= err, marker='s', ls='none', color='mediumblue', label='Original', alpha=0.5)
-        #plt.scatter(self.t, self.activity, color='crimson', marker='o', label='Activity')
-        plt.scatter(self.t, self.activity.real, color='skyblue', marker='o', label='Activity')
+        plt.scatter(self.t, self.activity, color='crimson', marker='o', label='Activity')
+        plt.scatter(self.t, self.activity_raw.real, color='skyblue', marker='o', label='Activity')
         plt.xlabel('Time (days)')
         plt.ylabel(self.names[0])
         plt.title('Activity correction')
         plt.legend(loc='lower left')
         
         if clean == True:
-            #residuals = self.obs[0] - self.activity
-            residuals_raw = self.obs[0] - self.activity.real
+            residuals = self.obs[0] - self.activity
+            residuals_raw = self.obs[0] - self.activity_raw.real
             print("Std dev of clean RV:", np.std(residuals_raw ))
             plt.figure(figsize=(8,6))
-            #plt.errorbar(self.t, self.obs[0], yerr= err, marker='s', ls='none', color='mediumblue', label='Total')
-            #plt.scatter(self.t, residuals, color='crimson', marker='o', label='Residuals', alpha=0.5)
+            plt.scatter(self.t, residuals, color='crimson', marker='o', label='Residuals', alpha=0.5)
             plt.scatter(self.t, residuals_raw, color='skyblue', marker='o', label='Residuals')
             plt.xlabel('Time (days)')
             plt.ylabel(self.names[0])
@@ -411,16 +410,16 @@ class fdac:
             print("No plot displayed")
             return
         
-        #self.residuals = self.obs[0] - self.activity
-        self.residuals_raw = self.obs[0] - self.activity.real
-        #self.residuals_FFT = nufft1d3(2*np.pi*self.t, self.residuals - np.mean(self.residuals), self.fgrid, \
-        #                              isign=-1, nthreads=1)
+        self.residuals = self.obs[0] - self.activity
+        self.residuals_raw = self.obs[0] - self.activity_raw.real
+        self.residuals_FFT = nufft1d3(2*np.pi*self.t, self.residuals - np.mean(self.residuals), self.fgrid, \
+                                      isign=-1, nthreads=1)
         self.residuals_raw_FFT = nufft1d3(2*np.pi*self.t, self.residuals_raw - np.mean(self.residuals_raw), self.fgrid, \
                                       isign=-1, nthreads=1)
         indeces = self.fgrid>=0
         plt.figure(figsize=(8,6))
         plt.plot(self.fgrid[indeces], np.abs(self.first_FFT[indeces])**2, label='Original', color='mediumblue', alpha = 0.5)
-        #plt.plot(self.fgrid[indeces], np.abs(self.residuals_FFT[indeces])**2,'--', label='Cleaned', color='r')
+        plt.plot(self.fgrid[indeces], np.abs(self.residuals_FFT[indeces])**2,'--', label='Cleaned', color='r')
         plt.plot(self.fgrid[indeces], np.abs(self.residuals_raw_FFT[indeces])**2,'-.', label='Cleaned', color='skyblue')
         plt.xlim(0,np.max(self.fgrid))
         if log==True:
