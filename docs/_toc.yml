@@ -10,6 +10,8 @@ parts:
     - file: FDACTutorial.ipynb
   - caption: Examples
     chapters:
+      - file: examples/HD99492_fdac.ipynb
+      - file: examples/CoRoT7_fdac.ipynb
       - file: examples/HD26965_PCA_fd.ipynb
       - file: examples/HD3651_fdac.ipynb
       - file: examples/HD34411_fdac.ipynb

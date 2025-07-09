@@ -147,7 +147,7 @@ class fdac:
         #save the lenght of the frequency grid
         self.len_fgrid = len(self.fgrid)
         # print(self.fgrid)
-        #self.powfgrid = self.fgrid[self.nf:]
+        self.powfgrid = self.fgrid[self.nf:]
         
     #Computes the NFFT of the activity indicators   
     def computeNFFT(self):
@@ -172,7 +172,7 @@ class fdac:
                   self.fgrid, isign=-1, nthreads=1)
             self.fft_list.append(fft_val)
         #Compute the NFFT if there are arrays that have nans
-        if self.t_nans!= None:
+        if isinstance(np.array(self.t_nans), (list, np.ndarray)) and len(self.t_nans)!=0 :
             if self.rest_nans.ndim ==1:
                 fft_val = nufft1d3(2*np.pi*self.t_nans, self.rest_nans - self.rest_nans.mean(), \
                     self.fgrid, isign=-1, nthreads=1)
@@ -273,8 +273,8 @@ class fdac:
             print("NFFT hasn't been computed yet, compute NFFT before proceeding")
             return
         #define the positive frequency grid and NFFT 
-        self.explanatory = self.FFTframe.loc[self.FFTframe.frequency>=0.0, self.FFTframe.columns[1:]]
-        self.targets = np.column_stack((self.first_FFT[self.fgrid>=0.0].real,self.first_FFT[self.fgrid>=0.0].imag))
+        self.explanatory = self.FFTframe.loc[self.FFTframe.frequency>=self.powfgrid[0], self.FFTframe.columns[1:]]
+        self.targets = np.column_stack((self.first_FFT[self.fgrid>=self.powfgrid[0]].real,self.first_FFT[self.fgrid>=self.powfgrid[0]].imag))
         self.fd_model = linear_model.LinearRegression(fit_intercept=False).fit(self.explanatory, self.targets)
 
         print('Coefficients')
@@ -377,7 +377,7 @@ class fdac:
         plt.figure(figsize=(8,6))
         plt.errorbar(self.t, self.first_com, yerr= err, marker='s', ls='none', color='mediumblue', label='Original', alpha=0.5)
         plt.scatter(self.t, self.activity, color='crimson', marker='o', label='Activity')
-        plt.scatter(self.t, self.activity_raw.real, color='skyblue', marker='o', label='Activity')
+        plt.scatter(self.t, self.activity_raw.real, color='skyblue', marker='o', label='Activity (Raw)')
         plt.xlabel('Time (days)')
         plt.ylabel(self.names[0])
         plt.title('Activity correction')
@@ -389,7 +389,7 @@ class fdac:
             print("Std dev of clean RV:", np.std(residuals_raw ))
             plt.figure(figsize=(8,6))
             plt.scatter(self.t, residuals, color='crimson', marker='o', label='Residuals', alpha=0.5)
-            plt.scatter(self.t, residuals_raw, color='skyblue', marker='o', label='Residuals')
+            plt.scatter(self.t, residuals_raw, color='skyblue', marker='o', label='Residuals (Raw)')
             plt.xlabel('Time (days)')
             plt.ylabel(self.names[0])
             plt.title('Residuals')
@@ -416,11 +416,10 @@ class fdac:
                                       isign=-1, nthreads=1)
         self.residuals_raw_FFT = nufft1d3(2*np.pi*self.t, self.residuals_raw - np.mean(self.residuals_raw), self.fgrid, \
                                       isign=-1, nthreads=1)
-        indeces = self.fgrid>=0
         plt.figure(figsize=(8,6))
-        plt.plot(self.fgrid[indeces], np.abs(self.first_FFT[indeces])**2, label='Original', color='mediumblue', alpha = 0.5)
-        plt.plot(self.fgrid[indeces], np.abs(self.residuals_FFT[indeces])**2,'--', label='Cleaned', color='r')
-        plt.plot(self.fgrid[indeces], np.abs(self.residuals_raw_FFT[indeces])**2,'-.', label='Cleaned', color='skyblue')
+        plt.plot(self.powfgrid, np.abs(self.first_FFT[self.nf:])**2, label='Original', color='mediumblue', alpha = 0.5)
+        plt.plot(self.powfgrid, np.abs(self.residuals_FFT[self.nf:])**2,'--', label='Cleaned', color='r')
+        plt.plot(self.powfgrid, np.abs(self.residuals_raw_FFT[self.nf:])**2,'-.', label='Cleaned (Raw)', color='skyblue', alpha=0.3)
         plt.xlim(0,np.max(self.fgrid))
         if log==True:
             plt.yscale('log')
